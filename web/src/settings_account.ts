@@ -93,20 +93,29 @@ export function update_email_change_display(): void {
     }
 }
 
-function display_avatar_upload_complete(): void {
-    $("#user-avatar-upload-widget .upload-spinner-background").css({visibility: "hidden"});
-    $("#user-avatar-upload-widget .image-upload-text").show();
-    $("#user-avatar-upload-widget .image-delete-button").show();
+export function display_avatar_upload_complete(
+    $container: JQuery = $("#user-avatar-upload-widget").parent(),
+): void {
+    $container
+        .find("#user-avatar-upload-widget .upload-spinner-background")
+        .css({visibility: "hidden"});
+    $container.find("#user-avatar-upload-widget .image-upload-text").show();
+    $container.find("#user-avatar-upload-widget .image-delete-button").show();
 }
 
-function display_avatar_upload_started(): void {
-    $("#user-avatar-source").hide();
-    $("#user-avatar-upload-widget .upload-spinner-background").css({visibility: "visible"});
-    $("#user-avatar-upload-widget .image-upload-text").hide();
-    $("#user-avatar-upload-widget .image-delete-button").hide();
+export function display_avatar_upload_started(
+    $container: JQuery = $("#user-avatar-upload-widget").parent(),
+): void {
+    $container.find("#user-avatar-source").hide();
+    $container
+        .find("#user-avatar-upload-widget .upload-spinner-background")
+        .css({visibility: "visible"});
+    $container.find("#user-avatar-upload-widget .image-upload-text").hide();
+    $container.find("#user-avatar-upload-widget .image-delete-button").hide();
 }
 
 function upload_avatar($file_input: JQuery<HTMLInputElement>): void {
+    const $container = $("#user-avatar-upload-widget").parent();
     const form_data = new FormData();
 
     assert(csrf_token !== undefined);
@@ -116,7 +125,7 @@ function upload_avatar($file_input: JQuery<HTMLInputElement>): void {
     for (const [i, file] of [...files].entries()) {
         form_data.append("file-" + i, file);
     }
-    display_avatar_upload_started();
+    display_avatar_upload_started($container);
     channel.post({
         url: "/json/users/me/avatar",
         data: form_data,
@@ -124,19 +133,21 @@ function upload_avatar($file_input: JQuery<HTMLInputElement>): void {
         processData: false,
         contentType: false,
         success() {
-            display_avatar_upload_complete();
-            $("#user-avatar-upload-widget .image_file_input_error").hide();
-            $("#user-avatar-source").hide();
+            display_avatar_upload_complete($container);
+            $container.find("#user-avatar-upload-widget .image_file_input_error").hide();
+            $container.find("#user-avatar-source").hide();
             // Rest of the work is done via the user_events -> avatar_url event we will get
         },
         error(xhr) {
-            display_avatar_upload_complete();
+            display_avatar_upload_complete($container);
             if (current_user.avatar_source === "G") {
-                $("#user-avatar-source").show();
+                $container.find("#user-avatar-source").show();
             }
             const parsed = z.object({msg: z.string()}).safeParse(xhr.responseJSON);
             if (parsed.success) {
-                const $error = $("#user-avatar-upload-widget .image_file_input_error");
+                const $error = $container.find(
+                    "#user-avatar-upload-widget .image_file_input_error",
+                );
                 $error.text(parsed.data.msg);
                 $error.show();
             }
@@ -144,21 +155,22 @@ function upload_avatar($file_input: JQuery<HTMLInputElement>): void {
     });
 }
 
-export function update_avatar_change_display(): void {
-    if ($("#user-avatar-upload-widget").length === 0) {
+export function update_avatar_change_display(prefix: string = ""): void {
+    const $container = $(`${prefix} #user-avatar-upload-widget`).parent();
+    if ($container.find("#user-avatar-upload-widget").length === 0) {
         return;
     }
 
     if (!settings_data.user_can_change_avatar()) {
-        $("#user-avatar-upload-widget .image_upload_button").addClass("hide");
-        $("#user-avatar-upload-widget .image-disabled").removeClass("hide");
+        $container.find("#user-avatar-upload-widget .image_upload_button").addClass("hide");
+        $container.find("#user-avatar-upload-widget .image-disabled").removeClass("hide");
     } else {
         if (!user_avatar_widget_created) {
-            avatar.build_user_avatar_widget(upload_avatar);
+            avatar.build_user_avatar_widget(upload_avatar, prefix);
             user_avatar_widget_created = true;
         }
-        $("#user-avatar-upload-widget .image_upload_button").removeClass("hide");
-        $("#user-avatar-upload-widget .image-disabled").addClass("hide");
+        $container.find("#user-avatar-upload-widget .image_upload_button").removeClass("hide");
+        $container.find("#user-avatar-upload-widget .image-disabled").addClass("hide");
     }
 }
 
@@ -169,7 +181,7 @@ export function update_account_settings_display(): void {
 
     update_name_change_display();
     update_email_change_display();
-    update_avatar_change_display();
+    update_avatar_change_display("#profile-settings");
 }
 
 export function maybe_update_deactivate_account_button(): void {
@@ -844,7 +856,7 @@ export function set_up(): void {
     user_avatar_widget_created = false;
 
     if (settings_data.user_can_change_avatar()) {
-        avatar.build_user_avatar_widget(upload_avatar);
+        avatar.build_user_avatar_widget(upload_avatar, "#profile-settings");
         user_avatar_widget_created = true;
     }
 

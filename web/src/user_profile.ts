@@ -64,6 +64,7 @@ import * as user_groups from "./user_groups.ts";
 import type {UserGroup} from "./user_groups.ts";
 import * as user_pill from "./user_pill.ts";
 import * as util from "./util.ts";
+import {display_avatar_upload_complete, display_avatar_upload_started} from "./settings_account.ts";
 
 export type CustomProfileFieldData = {
     id: number;
@@ -1113,6 +1114,53 @@ function toggle_submit_button($edit_form: JQuery): void {
     $submit_button.prop("disabled", false);
 }
 
+function upload_avatar(
+    $file_input: JQuery<HTMLInputElement>,
+    $container: JQuery,
+    target_user_id?: number,
+): void {
+    const form_data = new FormData();
+
+    assert(csrf_token !== undefined);
+    form_data.append("csrfmiddlewaretoken", csrf_token);
+    const files = util.the($file_input).files;
+    assert(files !== null);
+    for (const [i, file] of [...files].entries()) {
+        form_data.append("file-" + i, file);
+    }
+    display_avatar_upload_started($container);
+
+    const url = target_user_id ? `/json/users/${target_user_id}/avatar` : "/json/users/me/avatar";
+
+    channel.post({
+        url,
+        data: form_data,
+        cache: false,
+        processData: false,
+        contentType: false,
+        success() {
+            display_avatar_upload_complete($container);
+            $container.find("#user-avatar-upload-widget .image_file_input_error").hide();
+            $container.find("#user-avatar-source").hide();
+            // Rest of the work is done via the user_events -> avatar_url event we will get
+        },
+        error(xhr) {
+            display_avatar_upload_complete($container);
+            if (current_user.avatar_source === "G") {
+                $container.find("#user-avatar-source").show();
+            }
+            const parsed = z.object({msg: z.string()}).safeParse(xhr.responseJSON);
+            if (parsed.success) {
+                const $error = $container.find(
+                    "#user-avatar-upload-widget .image_file_input_error",
+                );
+                $error.text(parsed.data.msg);
+                $error.show();
+            }
+        },
+    });
+}
+
 export function show_edit_user_info_modal(user_id: number, $container: JQuery): void {
     const person = people.maybe_get_user_by_id(user_id);
     const is_active = people.is_person_active(user_id);
@@ -1131,9 +1179,26 @@ export function show_edit_user_info_modal(user_id: number, $container: JQuery): 
         disable_role_dropdown: person.is_owner && !current_user.is_owner,
         is_active,
         hide_deactivate_button,
+        user_is_guest: person.is_guest,
+        user_is_bot: person.is_bot,
+        user_avatar: person.avatar_url,
+        user_can_change_avatar: current_user.is_admin,
     });
 
     $container.append($(html_body));
+
+    // Update avatar widget to support admin-based updates
+    const upload_function = (data: JQuery<HTMLInputElement>) => {
+        const $form = $("#edit-user-form");
+        if (current_user.is_admin && user_id !== current_user.user_id) {
+            upload_avatar(data, $form, user_id);
+        } else {
+            upload_avatar(data, $form);
+        }
+    };
+
+    avatar.build_user_avatar_widget(upload_function, "#edit-user-form");
+
     // Set role dropdown and fields user pills
     $("#user-role-select").val(person.role);
     if (!current_user.is_owner) {
@@ -1502,4 +1567,20 @@ export function initialize(): void {
             show_check_icon: true,
         });
     });
+}
+
+function handle_avatar_upload(user_id: number): void {
+    const $form = $("#edit-user-form");
+    const $upload_button = $form
+        .find(".edit_user_avatar_upload_button")
+        .first() as JQuery<HTMLInputElement>;
+    upload_avatar($upload_button, $form, user_id);
+}
+
+function handle_delete_avatar(user_id: number): void {
+    const $form = $("#edit-user-form");
+    const $delete_button = $form
+        .find(".edit_user_avatar_delete_button")
+        .first() as JQuery<HTMLInputElement>;
+    upload_avatar($delete_button, $form);
 }
