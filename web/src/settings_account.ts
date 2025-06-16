@@ -152,23 +152,21 @@ function upload_avatar($file_input: JQuery<HTMLInputElement>): void {
     });
 }
 
-export function update_avatar_change_display(
-    $container: JQuery = $("#user-avatar-upload-widget").parent(),
-): void {
-    if ($container.find("#user-avatar-upload-widget").length === 0) {
+export function update_avatar_change_display(): void {
+    if ($("#user-avatar-upload-widget").length === 0) {
         return;
     }
 
     if (!settings_data.user_can_change_avatar()) {
-        $container.find("#user-avatar-upload-widget .image_upload_button").addClass("hide");
-        $container.find("#user-avatar-upload-widget .image-disabled").removeClass("hide");
+        $("#user-avatar-upload-widget .image_upload_button").addClass("hide");
+        $("#user-avatar-upload-widget .image-disabled").removeClass("hide");
     } else {
         if (!user_avatar_widget_created) {
-            avatar.build_user_avatar_widget(upload_avatar, $container);
+            avatar.build_user_avatar_widget(upload_avatar);
             user_avatar_widget_created = true;
         }
-        $container.find("#user-avatar-upload-widget .image_upload_button").removeClass("hide");
-        $container.find("#user-avatar-upload-widget .image-disabled").addClass("hide");
+        $("#user-avatar-upload-widget .image_upload_button").removeClass("hide");
+        $("#user-avatar-upload-widget .image-disabled").addClass("hide");
     }
 }
 
@@ -854,8 +852,7 @@ export function set_up(): void {
     user_avatar_widget_created = false;
 
     if (settings_data.user_can_change_avatar()) {
-        const $container = $("#user-avatar-upload-widget").parent();
-        avatar.build_user_avatar_widget(upload_avatar, $container);
+        avatar.build_user_avatar_widget(upload_avatar);
         user_avatar_widget_created = true;
     }
 

@@ -71,30 +71,23 @@ function display_avatar_delete_started(): void {
     $("#user-avatar-upload-widget .image-delete-button").hide();
 }
 
-export function build_user_avatar_widget(
-    upload_function: UploadFunction,
-    $container: JQuery,
-): void {
-    const get_file_input = function (
-        $container: JQuery = $("#user-avatar-upload-widget").parent(),
-    ): JQuery<HTMLInputElement> {
-        return $container
-            .find<HTMLInputElement>("#user-avatar-upload-widget input.image_file_input")
-            .expectOne();
+export function build_user_avatar_widget(upload_function: UploadFunction): void {
+    const get_file_input = function (): JQuery<HTMLInputElement> {
+        return $<HTMLInputElement>("#user-avatar-upload-widget input.image_file_input").expectOne();
     };
 
     if (current_user.avatar_source === "G") {
-        $container.find("#user-avatar-upload-widget .image-delete-button").hide();
-        $container.find("#user-avatar-source").show();
+        $("#user-avatar-upload-widget .image-delete-button").hide();
+        $("#user-avatar-source").show();
     } else {
-        $container.find("#user-avatar-source").hide();
+        $("#user-avatar-source").hide();
     }
 
     if (!settings_data.user_can_change_avatar()) {
         return;
     }
 
-    $container.find("#user-avatar-upload-widget .image-delete-button").on("click", (e) => {
+    $("#user-avatar-upload-widget .image-delete-button").on("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         function delete_user_avatar(): void {
@@ -111,7 +104,7 @@ export function build_user_avatar_widget(
                 },
                 error() {
                     display_avatar_delete_complete();
-                    $container.find("#user-avatar-upload-widget .image-delete-button").show();
+                    $("#user-avatar-upload-widget .image-delete-button").show();
                 },
             });
         }
@@ -126,47 +119,67 @@ export function build_user_avatar_widget(
 
     upload_widget.build_direct_upload_widget(
         get_file_input,
-        $container.find("#user-avatar-upload-widget .image_file_input_error").expectOne(),
-        $container.find("#user-avatar-upload-widget .image_upload_button").expectOne(),
+        $("#user-avatar-upload-widget .image_file_input_error").expectOne(),
+        $("#user-avatar-upload-widget .image_upload_button").expectOne(),
         upload_function,
         realm.max_avatar_file_size_mib,
     );
 }
 
-export function build_user_avatar_widget_by_id(
-    upload_function: UploadFunction,
-    $container: JQuery,
-): void {
+export function build_user_avatar_widget_by_id(upload_function: UploadFunction): void {
     if (!settings_data.user_can_change_avatar()) {
         return;
     }
     const get_file_input = function (): JQuery<HTMLInputElement> {
-        return $container
-            .find<HTMLInputElement>("#user-avatar-upload-widget input.image_file_input")
-            .expectOne();
+        return $<HTMLInputElement>(
+            "#edit-user-form #user-avatar-upload-widget input.image_file_input",
+        ).expectOne();
     };
 
-    const user_id = Number($container.attr("data-user-id"));
+    const user_id = Number($("#edit-user-form").attr("data-user-id"));
     // Use get_user_by_id_assert_valid which throws if user doesn't exist
     const person = people.get_user_by_id_assert_valid(user_id);
+    if (person.avatar_source === "G") {
+        $("#edit-user-form #user-avatar-upload-widget .image-delete-button").hide();
+        $("#edit-user-form #user-avatar-source").show();
+    } else {
+        $("#edit-user-form #user-avatar-source").hide();
+    }
 
-    $container.find("#user-avatar-upload-widget .image-delete-button").hide();
-    $container.find("#user-avatar-source").show();
-
-    $container.find("#user-avatar-upload-widget .image-delete-button").on("click", (e) => {
+    $("#edit-user-form #user-avatar-upload-widget .image-delete-button").on("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        $container
-            .find<HTMLInputElement>("#user-avatar-upload-widget .image-block")
-            .attr("src", person.avatar_url ?? "");
-        $container.find<HTMLInputElement>("#user-avatar-upload-widget .image-delete-button").hide();
-        $container.find<HTMLInputElement>("#user-avatar-source").show();
+        function delete_user_avatar(): void {
+            // display_avatar_delete_started();
+            void channel.del({
+                url: `/json/users/${user_id}/avatar`,
+
+                success() {
+                    // display_avatar_delete_complete();
+                    // Need to clear input because of a small edge case
+                    // where you try to upload the same image you just deleted.
+                    // get_file_input().val("");
+                    // Rest of the work is done via the user_events -> avatar_url event we will get
+                },
+                error() {
+                    // display_avatar_delete_complete();
+                    // $("#user-avatar-upload-widget .image-delete-button").show();
+                },
+            });
+        }
+        const html_body = render_confirm_delete_user_avatar({});
+
+        confirm_dialog.launch({
+            html_heading: $t_html({defaultMessage: "Delete profile picture"}),
+            html_body,
+            on_click: delete_user_avatar,
+        });
     });
 
     upload_widget.build_direct_upload_widget(
         get_file_input,
-        $container.find("#user-avatar-upload-widget .image_file_input_error").expectOne(),
-        $container.find("#user-avatar-upload-widget .image_upload_button").expectOne(),
+        $("#edit-user-form #user-avatar-upload-widget .image_file_input_error").expectOne(),
+        $("#edit-user-form #user-avatar-upload-widget .image_upload_button").expectOne(),
         upload_function,
         realm.max_avatar_file_size_mib,
     );

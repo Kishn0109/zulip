@@ -11,6 +11,7 @@ from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 from pydantic import AfterValidator, BaseModel, Json, StringConstraints
 
 from zerver.actions.bots import (
@@ -28,6 +29,7 @@ from zerver.actions.user_settings import (
     check_change_bot_full_name,
     check_change_full_name,
     do_change_avatar_fields,
+    do_delete_avatar_image,
     do_change_user_delivery_email,
     do_regenerate_api_key,
 )
@@ -92,6 +94,7 @@ from zerver.models.realms import (
     EmailContainsPlusError,
     InvalidFakeEmailDomainError,
     Realm,
+    avatar_changes_disabled,
 )
 from zerver.models.users import (
     get_user_by_delivery_email,
@@ -100,6 +103,8 @@ from zerver.models.users import (
     get_user_profile_by_id_in_realm,
 )
 from zproject.backends import check_password_strength
+
+AVATAR_CHANGES_DISABLED_ERROR = gettext_lazy("Avatar changes are disabled in this organization.")
 
 RoleParamType: TypeAlias = Annotated[
     int,
@@ -240,6 +245,31 @@ def update_user_by_id_api(
         profile_data=profile_data,
         new_email=new_email,
     )
+
+
+@typed_endpoint_without_parameters
+@transaction.atomic(durable=True)
+def delete_avatar_by_id_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    user_id: PathOnly[int],
+) -> HttpResponse:
+    target = access_user_by_id(
+        user_profile, user_id, allow_deactivated=True, allow_bots=True, for_admin=True
+    )
+
+    if avatar_changes_disabled(target.realm) and not user_profile.is_realm_admin:
+        raise JsonableError(str(AVATAR_CHANGES_DISABLED_ERROR))
+
+    do_delete_avatar_image(
+        target, acting_user=user_profile
+    )
+    gravatar_url = avatar_url(target) 
+
+    json_result = dict(
+        avatar_url=gravatar_url,
+    )
+    return json_success(request, data=json_result)
 
 
 @typed_endpoint
@@ -939,3 +969,5 @@ def get_user_by_email(
         target_user=target_user,
     )
     return json_success(request, data)
+
+
