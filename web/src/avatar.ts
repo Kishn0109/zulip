@@ -5,6 +5,7 @@ import render_confirm_delete_user_avatar from "../templates/confirm_dialog/confi
 import * as channel from "./channel.ts";
 import * as people from "./people.ts";
 import * as confirm_dialog from "./confirm_dialog.ts";
+import * as dialog_widget from "./dialog_widget.ts";
 import {$t_html} from "./i18n.ts";
 import * as settings_data from "./settings_data.ts";
 import {current_user, realm} from "./state_data.ts";
@@ -150,22 +151,7 @@ export function build_user_avatar_widget_by_id(upload_function: UploadFunction):
         e.preventDefault();
         e.stopPropagation();
         function delete_user_avatar(): void {
-            // display_avatar_delete_started();
-            void channel.del({
-                url: `/json/users/${user_id}/avatar`,
-
-                success() {
-                    // display_avatar_delete_complete();
-                    // Need to clear input because of a small edge case
-                    // where you try to upload the same image you just deleted.
-                    // get_file_input().val("");
-                    // Rest of the work is done via the user_events -> avatar_url event we will get
-                },
-                error() {
-                    // display_avatar_delete_complete();
-                    // $("#user-avatar-upload-widget .image-delete-button").show();
-                },
-            });
+            dialog_widget.submit_api_request(channel.del, `/json/users/${user_id}/avatar`, {});
         }
         const html_body = render_confirm_delete_user_avatar({});
 
@@ -173,6 +159,7 @@ export function build_user_avatar_widget_by_id(upload_function: UploadFunction):
             html_heading: $t_html({defaultMessage: "Delete profile picture"}),
             html_body,
             on_click: delete_user_avatar,
+            loading_spinner: true,
         });
     });
 
